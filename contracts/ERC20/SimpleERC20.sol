@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 contract SimpleERC20 {
     string _name;                                   //0
     string _symbol;                                 //1
-    uint8 _decimals;                                //2
+    uint8 _decimals = 18;                           //2
     uint _totalSupply;                              //3
     mapping (address => uint) _balances;            //4
     mapping(address owner => mapping(address spender => uint value)) _allowances;
@@ -22,6 +22,10 @@ contract SimpleERC20 {
         contractOwner = msg.sender;
         _name = name_;
         _symbol = symbol_;
+    }
+
+    function decimals() external virtual view returns(uint8) {
+        return _decimals;
     }
 
     function name() external virtual view returns(string memory) {
@@ -43,11 +47,12 @@ contract SimpleERC20 {
         return true;
     }
     function transferFrom(address from, address to, uint value) external virtual returns(bool) {
-        require(_allowances[from][msg.sender] >= value, "not enough allowance");
+        uint currentValue = _allowances[from][msg.sender];
+        require(currentValue >= value, "not enough allowance");
         _transfer(from, to, value);
-        _approve(from, msg.sender, value, false);
+        _approve(from, msg.sender, currentValue - value, false);
         emit Transfer(from, to, value);
-
+        
         return true;
     }
     function _transfer(address from, address to, uint value) internal virtual {

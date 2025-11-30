@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./SimpleERC20.sol";
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {stdStorage, StdStorage} from "forge-std/Test.sol";
 
 contract SimpleERC20Test is Test {
@@ -117,5 +117,4 @@ contract SimpleERC20Test is Test {
         
         assertEq(simpleERC20.balanceOf(account1), 0);
     }
-    // mint, burn
 }
