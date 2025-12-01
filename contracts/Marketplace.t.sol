@@ -39,7 +39,7 @@ contract MarketPlaceTest is Test {
 
         erc721Contract.safeMint(owner, "QmXzZ7ZVwDRJ5acZzYbEdYbhZdgpFTcvCafXdis23XjB4W"); // tokenId = 0
         erc721Contract.safeMint(owner, "QmX553Mn6xpx1H8brBNPV6qcR2UBcFrC8LUYsVmctWk8xZ"); // tokenId = 1
-        erc721Contract.safeMint(kate, "QmSiK3Pg4tfYGKdHb4VjAm3NUDxTrtoCFfjRTLvfu8k5wn");  // tokenId = 2
+        // erc721Contract.safeMint(kate, "QmSiK3Pg4tfYGKdHb4VjAm3NUDxTrtoCFfjRTLvfu8k5wn");  // tokenId = 2
 
         // multiple
         tokensIds = [0,1];
@@ -296,5 +296,5 @@ contract MarketPlaceTest is Test {
         erc721Contract.setApprovalForAll(address(marketContract), true);
         marketContract.multipleAdd(address(erc721Contract), tokensIds, addressesToken, prices);
     }
-
+    
 }

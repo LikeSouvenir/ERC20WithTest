@@ -8,10 +8,10 @@ contract BaseNFT is ERC721URIStorage {
 
     constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}
 
-    function safeMint(address to,string memory _tokenURI) external {
+    function safeMint(address to,string memory _tokenURI) external returns(uint){
         _safeMint(to, nextId);
         _setTokenURI(nextId, _tokenURI);
-        nextId++;
+        return nextId++;
     }
 
     function _baseURI() internal pure override returns (string memory) {
