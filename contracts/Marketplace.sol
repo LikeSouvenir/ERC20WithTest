@@ -7,8 +7,13 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
+import "@openzeppelin/contracts/utils/math/Math.sol";
+
 contract Marketplace {
-    uint8 _feePersent = 2;
+    using Math for uint256;
+
+    uint constant _FEE_DENUMENATOR_BPS = 10_000;
+    uint _feeBPS = 200;
     address _feeReceiver; 
 
     struct TokenPrice {
@@ -19,6 +24,17 @@ contract Marketplace {
     mapping(address NFT => mapping(uint tokenId => TokenPrice)) private _nftInfoMap;
     mapping(address NFT => uint[]) private _nftAddressToTokenIdMap;
     address[] private _allNFTs;
+
+    // modifier enoughAllowance(address user) {
+    //     _;
+    // }
+
+    struct Offer {
+        address from;
+        uint endTime;
+        uint amount;
+    }
+    mapping(address NFT => mapping(uint tokenId => Offer[])) _offers;
 
 
     constructor(address feeReceiver) {
@@ -114,17 +130,6 @@ contract Marketplace {
         }
     }
 
-    // modifier enoughAllowance(address user) {
-    //     _;
-    // }
-
-    struct Offer {
-        address from;
-        uint endTime;
-        uint amount;
-    }
-    mapping(address NFT => mapping(uint tokenId => Offer[])) _offers;
-
     function setOffer(address addressNFT, uint tokenId, uint offer, uint endTime) external isListed(addressNFT, tokenId) {
         require(block.timestamp < endTime, "incorrect end time");
         _offers[addressNFT][tokenId].push(Offer(msg.sender, offer, endTime));
@@ -148,7 +153,7 @@ contract Marketplace {
             price = tokenInfo.price;
         if (to == address(0))
             to = msg.sender;
-        uint fee = price / 100 * _feePersent;
+        uint fee = calculatePersent(price);
 
         require(tokenInfo.payableToken.allowance(to, address(this)) >= price + fee, "must be approve price + fee");
         address tokenOwner = IERC721(addressNFT).ownerOf(tokenId);
@@ -165,20 +170,26 @@ contract Marketplace {
         return _offers[addressNFT][tokenId];
     }
 
-    function setFeePersent(uint8 feePersent) external {// onlyOwner
-        _feePersent = feePersent;
-        // должна быть возможность установить минимальную комиссию 0.01% (смотри базисные пункты и как с ними работать в solidity для точных расчетов)
+    function setFeePersent(uint feeBPS) external {// onlyOwner
+        require(feeBPS >= 1, "min % is 0,01");
+        require(feeBPS <= _FEE_DENUMENATOR_BPS, "max % is 100");
+        _feeBPS = feeBPS;
     }
+
+    function calculatePersent(uint price) public view returns(uint fee) {
+        fee = price.mulDiv(_feeBPS, _FEE_DENUMENATOR_BPS);
+    }
+
+    function getFeeBPS() external view returns(uint) {// onlyOwner
+        return _feeBPS;
+    }
+
     function setFeeReceiver(address feeReceiver) external {// onlyOwner
         _feeReceiver = feeReceiver;
     }
 
     function getReceiver() external view returns(address) {
         return _feeReceiver;
-    }
-
-    function getFeePersent() external view returns(uint8) {
-        return _feePersent;
     }
 
     function getAll() external view returns(address[] memory) {

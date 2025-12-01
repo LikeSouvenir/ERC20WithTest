@@ -44,7 +44,7 @@ contract MarketPlaceTest is Test {
         // multiple
         tokensIds = [0,1];
         addressesToken = [address(erc20Contract), address(erc20Contract)];
-        prices = [99, 192];
+        prices = [99_000, 192_000];
     }
     // add
     function test_BadTokenAddress_add() public {
@@ -63,7 +63,7 @@ contract MarketPlaceTest is Test {
         erc721Contract.setApprovalForAll(address(marketContract), true);
         marketContract.multipleAdd(address(erc721Contract), tokensIds, addressesToken, prices);
 
-        bytes32 key = keccak256(abi.encode(address(erc721Contract), 1));
+        bytes32 key = keccak256(abi.encode(address(erc721Contract), 2));
         bytes32 keyToKey = keccak256(abi.encode(tokensIds[0], key));
 
         bytes32 slot1 = vm.load(address(marketContract), keyToKey);
@@ -117,7 +117,7 @@ contract MarketPlaceTest is Test {
     function test_GoodTokenAddress_multipleAdd() public {
         _setOwnerApprovalAndAddTwoDefaultNft();
 
-        bytes32 key = keccak256(abi.encode(address(erc721Contract), 1));
+        bytes32 key = keccak256(abi.encode(address(erc721Contract), 2));
         bytes32 keyToKey = keccak256(abi.encode(tokensIds[0], key));
 
         bytes32 slot1 = vm.load(address(marketContract), keyToKey);
@@ -278,23 +278,58 @@ contract MarketPlaceTest is Test {
         vm.prank(address(marketContract));
         erc20Contract.mint(mix, 100 * 10 ** erc20Contract.decimals());
         uint balanceBefore = erc20Contract.balanceOf(mix);
+
         (,,uint tokenPrice) = marketContract.getByAddressAndId(address(erc721Contract), tokensIds[0]);
-        uint fee = tokenPrice / 100 * marketContract.getFeePersent();
-        uint collision = 1;
+        uint fee = marketContract.calculatePersent(tokenPrice);
 
         vm.startPrank(mix);
-        erc20Contract.approve(address(marketContract), tokenPrice + fee + collision);
+        erc20Contract.approve(address(marketContract), tokenPrice + fee);
 
         marketContract.buy(address(erc721Contract), tokensIds[0]);
 
         vm.assertEq(erc20Contract.balanceOf(mix), balanceBefore - tokenPrice);
         vm.assertEq(erc721Contract.ownerOf(tokensIds[0]), mix);
     }
+    //multiBuy
+    function test_correct_multiBuy() public {
+        _setOwnerApprovalAndAddTwoDefaultNft();
+        vm.stopPrank();
+
+        vm.prank(address(marketContract));
+        erc20Contract.mint(mix, 100 * 10 ** erc20Contract.decimals());
+        uint tokenPriceAmount;
+
+        for (uint i = 0; i < tokensIds.length; i++) {
+            (,,uint tokenPrice) = marketContract.getByAddressAndId(address(erc721Contract), tokensIds[i]);
+            uint fee = marketContract.calculatePersent(tokenPrice);
+            tokenPriceAmount += tokenPrice + fee;
+        }
+        vm.startPrank(mix);
+        erc20Contract.approve(address(marketContract), tokenPriceAmount);
+
+        marketContract.multiBuy(address(erc721Contract), tokensIds);
+
+        vm.assertEq(erc721Contract.ownerOf(tokensIds[0]), mix);
+        vm.assertEq(erc721Contract.ownerOf(tokensIds[1]), mix);
+    }
+    // setOffer
+    function test_correct_offer() public {
+
+    }
+    // receiveOffer
+    // getOffers
+    // setFeePersent 0, 10001, valid
+    // getFeeBPS notOwner
+    // setFeeReceiver 
+    // getReceiver
+    // getAll
+    // getTokensId
+    // calculatePersent 0, 1000000000000 notOwner
     
+    // support functions
     function _setOwnerApprovalAndAddTwoDefaultNft() internal {
         vm.startPrank(owner);
         erc721Contract.setApprovalForAll(address(marketContract), true);
         marketContract.multipleAdd(address(erc721Contract), tokensIds, addressesToken, prices);
     }
-    
 }
