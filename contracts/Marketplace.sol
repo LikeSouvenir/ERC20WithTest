@@ -34,7 +34,7 @@ contract Marketplace is Ownable, ReentrancyGuard{
     event ItemSold(address indexed addressNFT, uint indexed tokenId, uint cost); 
 
     event OfferCreated(address indexed addressNFT, uint indexed tokenId, address indexed from, uint endTime, uint amount); 
-    event OfferCanceled(address indexed addressNFT, uint indexed tokenId);
+    event OfferCanceled(address indexed addressNFT, uint indexed tokenId, address indexed from);
 
     event UpdatePlatformFee(uint indexed fee); 
     event UpdatePlatformFeeRecipient(address indexed recipient);
@@ -123,6 +123,7 @@ contract Marketplace is Ownable, ReentrancyGuard{
 
     function setOffer(address addressNFT, uint tokenId, uint offer, uint endTime) external isListed(addressNFT, tokenId) isOffered(addressNFT, tokenId) {
         require(block.timestamp < endTime, "incorrect end time");
+        require(offer > 0, "offer must be > 0");
         _offers[addressNFT][tokenId][msg.sender] = Offer(endTime, offer);
         
         emit OfferCreated(addressNFT, tokenId, msg.sender, endTime, offer); 
@@ -137,7 +138,7 @@ contract Marketplace is Ownable, ReentrancyGuard{
             revert("permission denied");
         }
         
-        emit OfferCanceled(addressNFT, tokenId);
+        emit OfferCanceled(addressNFT, tokenId, from);
     }
 
     function receiveOffer(address addressNFT, uint tokenId, address from) external haveRules(addressNFT, tokenId) {
@@ -149,10 +150,11 @@ contract Marketplace is Ownable, ReentrancyGuard{
 
         delete _offers[addressNFT][tokenId][from];
         
-        emit OfferCanceled(addressNFT, tokenId);
+        emit OfferCanceled(addressNFT, tokenId, from);
     }
 
     function _send(address addressNFT, uint tokenId, uint price, address to) internal isListed(addressNFT, tokenId) nonReentrant {
+        require(price > 0, "must be > 0");
         TokenPrice storage tokenInfo = _nftInfoMap[addressNFT][tokenId];
         if (price == 0)
             price = tokenInfo.price;
