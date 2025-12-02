@@ -72,14 +72,17 @@ contract SimpleERC20 {
     }
 
     function increaseAllowance(address spender, uint value) external virtual returns(bool){
-        uint currentValue = _allowances[msg.sender][spender];///////////////////////////////////////////////////////////////проверка на 0 
-        _approve(msg.sender, spender, value + currentValue);
+        uint currentValue = _allowances[msg.sender][spender]; 
+
+        _approve(msg.sender, spender, currentValue + value);
         return true;
     }
 
-    function decreaseAllowance(address spender,  uint value) external virtual returns(bool){
+    function decreaseAllowance(address spender, uint value) external virtual returns(bool){
         uint currentValue = _allowances[msg.sender][spender];
-        _approve(msg.sender, spender, value - currentValue);
+        require(currentValue >= value, "incorrect value");
+
+        _approve(msg.sender, spender, currentValue - value);
         return true;
     }
 

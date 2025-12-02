@@ -12,7 +12,7 @@ contract SimpleERC20Test is Test {
     string defaultSymbol = "DN";
 
     event Transfer(address indexed from, address indexed to, uint value);
-    event Approve(address indexed from, address indexed to, uint value);
+    event Approval(address indexed from, address indexed to, uint value);
     address account1 = vm.addr(1);
     address account2 = vm.addr(2);
     address account3 = vm.addr(3);
@@ -41,7 +41,7 @@ contract SimpleERC20Test is Test {
     }
 
     function test_decimals() public view{
-        uint8 defaultDecimals = uint8(uint256(vm.load(address(simpleERC20), bytes32(uint256(2)))));
+        uint8 defaultDecimals = 18;
         uint8 currentDecimals = simpleERC20.decimals();
 
         assertEq(currentDecimals, defaultDecimals);
@@ -60,7 +60,7 @@ contract SimpleERC20Test is Test {
     }
 
     function test_approveWithSlot() public {
-        uint slot = uint256(keccak256(abi.encode(account2, uint256(5))));
+        uint slot = uint256(keccak256(abi.encode(account2, uint256(4))));
         bytes32 key = keccak256(abi.encode(account3, slot));
         vm.store(address(simpleERC20), key, bytes32(value));
         assertEq(simpleERC20.allowance(account2, account3), value);
@@ -68,7 +68,7 @@ contract SimpleERC20Test is Test {
 
     function test_approveEmit() public {
         vm.expectEmit(true,true,false, true);
-        emit Approve(account2, account3, value);
+        emit Approval(account2, account3, value);
         test_approveWithAllownace();
     }
 
@@ -77,11 +77,32 @@ contract SimpleERC20Test is Test {
         simpleERC20.approve(account3, value);
         assertEq(simpleERC20.allowance(account2, account3), value);
     }
+    function test_increaseAllowance() external {
+        vm.startPrank(account1);
+        simpleERC20.increaseAllowance(account2, value);
+        
+        assertEq(simpleERC20.allowance(account1, account2), value);
+    }
 
-    function test_allowanceWithSlot( ) public {
+    function test_decreaseAllowance() external {
+        vm.startPrank(account1);
+
+        simpleERC20.approve(account2, value);
+        
+        simpleERC20.decreaseAllowance(account2, 100);
+        assertEq(simpleERC20.allowance(account1, account2), value - 100);
+    }
+    function test_Incorrect_decreaseAllowance() external {
+        vm.startPrank(account1);
+        
+        vm.expectRevert(bytes("incorrect value"));
+        simpleERC20.decreaseAllowance(account1, value);
+    }
+
+    function test_allowanceWithSlot() public {
         vm.store(
             address(simpleERC20), 
-            keccak256(abi.encode(account3, keccak256(abi.encode(account2, uint256(5))))), 
+            keccak256(abi.encode(account3, keccak256(abi.encode(account2, uint256(4))))), 
             bytes32(uint256(value))
         );
         assertEq(simpleERC20.allowance(account2, account3), value);
