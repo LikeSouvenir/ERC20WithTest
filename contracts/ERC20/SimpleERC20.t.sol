@@ -133,7 +133,6 @@ contract SimpleERC20Test is Test {
         simpleERC20.approve(account3, value);
         assertEq(simpleERC20.allowance(account1, account3), value);
 
-        
         vm.prank(account3);
         simpleERC20.transferFrom(account1, account2, value);
         
@@ -143,7 +142,7 @@ contract SimpleERC20Test is Test {
     function test_burn() public {
         test_mint();
         assertEq(simpleERC20.balanceOf(account1), value);
-        vm.prank(account1); 
+        vm.prank(account1);
         simpleERC20.burn(value);
         assertEq(simpleERC20.balanceOf(account1), 0);
     }
