@@ -143,7 +143,7 @@ contract SimpleERC20Test is Test {
     function test_burn() public {
         test_mint();
         assertEq(simpleERC20.balanceOf(account1), value);
-        vm.prank(account1);
+        vm.prank(account1); 
         simpleERC20.burn(value);
         assertEq(simpleERC20.balanceOf(account1), 0);
     }
