@@ -29,7 +29,7 @@ contract Marketplace is Ownable, ReentrancyGuard{
     mapping(address NFT => mapping(uint tokenId => TokenPrice)) private _nftInfoMap;
     mapping(address NFT => mapping(uint tokenId => mapping(address from => Offer))) _offers;
 
-    event ItemListed(address indexed addressNFT, uint indexed tokenId, uint cost);
+    event ItemListed(address indexed addressNFT, uint indexed tokenId, bool isListed);
     event ItemUpdated(address indexed addressNFT, uint indexed tokenId, address addressERC20, uint cost); 
     event ItemSold(address indexed addressNFT, uint indexed tokenId, uint cost); 
 
@@ -68,6 +68,11 @@ contract Marketplace is Ownable, ReentrancyGuard{
         _;
     }
 
+    modifier notZeroAddress(address addr) {
+        require(addr != address(0), "zero address");
+        _;
+    }
+
     modifier haveRules(address addressNFT, uint tokenId) {
         IERC721 nft = IERC721(addressNFT);
         address tokenOwner = nft.ownerOf(tokenId);
@@ -79,8 +84,8 @@ contract Marketplace is Ownable, ReentrancyGuard{
         _add(addressNFT, tokenId, addressToken, price);
     }
 
-    function _add(address addressNFT, uint tokenId, address addressToken, uint price) internal notListed(addressNFT, tokenId) haveRules(addressNFT, tokenId) {
-        require(addressToken != address(0), "zero address");
+    function _add(address addressNFT, uint tokenId, address addressToken, uint price) internal notListed(addressNFT, tokenId) haveRules(addressNFT, tokenId) notZeroAddress(addressToken) {
+        require(price > 0, "must be > 0");
         TokenPrice storage tokenInfo = _nftInfoMap[addressNFT][tokenId];
 
         tokenInfo.payableToken = IERC20(addressToken);
@@ -88,15 +93,15 @@ contract Marketplace is Ownable, ReentrancyGuard{
         tokenInfo.isListed = true;
         tokenInfo.isOffered = true;
 
-        emit ItemListed(addressNFT, tokenId, price);
+        emit ItemListed(addressNFT, tokenId, true);
     }
 
     function change(address addressNFT, uint tokenId, address addressToken, uint price) external  {
         _change(addressNFT, tokenId, addressToken, price);
     }
 
-    function _change(address addressNFT, uint tokenId, address addressToken, uint price) internal isListed(addressNFT, tokenId) haveRules(addressNFT, tokenId) {
-        require(addressToken != address(0), "zero address");
+    function _change(address addressNFT, uint tokenId, address addressToken, uint price) internal isListed(addressNFT, tokenId) haveRules(addressNFT, tokenId) notZeroAddress(addressToken) {
+        require(price > 0, "must be > 0");
 
         TokenPrice storage tokenInfo = _nftInfoMap[addressNFT][tokenId];
         tokenInfo.payableToken = IERC20(addressToken);
@@ -107,6 +112,8 @@ contract Marketplace is Ownable, ReentrancyGuard{
     
     function cancel(address addressNFT, uint tokenId) external isListed(addressNFT, tokenId) haveRules(addressNFT, tokenId) {
         _nftInfoMap[addressNFT][tokenId].isListed = false;
+
+        emit ItemListed(addressNFT, tokenId, false);
     }
 
     function buy(address addressNFT, uint tokenId) external {
@@ -154,7 +161,6 @@ contract Marketplace is Ownable, ReentrancyGuard{
     }
 
     function _send(address addressNFT, uint tokenId, uint price, address to) internal isListed(addressNFT, tokenId) nonReentrant {
-        require(price > 0, "must be > 0");
         TokenPrice storage tokenInfo = _nftInfoMap[addressNFT][tokenId];
         if (price == 0)
             price = tokenInfo.price;
@@ -195,8 +201,7 @@ contract Marketplace is Ownable, ReentrancyGuard{
         return _feeBPS;
     }
 
-    function setFeeReceiver(address feeReceiver) external onlyOwner{ 
-        require(feeReceiver != address(0), "zero address");
+    function setFeeReceiver(address feeReceiver) external  notZeroAddress(feeReceiver) onlyOwner{ 
         _feeReceiver = feeReceiver;
         
         emit UpdatePlatformFeeRecipient(feeReceiver);

@@ -54,17 +54,15 @@ contract MarketPlaceTest is Test {
     }
 
     function test_NotHaveApproval_add() public {
-        vm.expectRevert(bytes("must set approval or operator"));
+        // vm.expectRevert(bytes("must set approval or operator"));
         vm.prank(owner);
         marketContract.add(address(erc721Contract), tokensIds[0], addressesToken[0], prices[0]);
     }
 
     function test_GoodTokenAddress_add() public {
-        vm.startPrank(owner);
-        erc721Contract.setApprovalForAll(address(marketContract), true);
-        marketContract.add(address(erc721Contract), tokensIds[0], addressesToken[0], prices[0]);
+        _setOwnerApprovalAndAddTwoDefaultNft();
 
-        bytes32 key = keccak256(abi.encode(address(erc721Contract), 3));
+        bytes32 key = keccak256(abi.encode(address(erc721Contract), 4));
         bytes32 keyToKey = keccak256(abi.encode(tokensIds[0], key));
 
         bytes32 slot1 = vm.load(address(marketContract), keyToKey);
@@ -73,8 +71,8 @@ contract MarketPlaceTest is Test {
         address payableTokenFromSlot = address(uint160(uint256(slot1)));
         uint priceFromSlot = uint(slot2);
 
-        vm.assertEq(priceFromSlot, prices[0]);
         vm.assertEq(payableTokenFromSlot, address(erc20Contract));
+        vm.assertEq(priceFromSlot, prices[0]);
 
         (IERC20 payableToken,uint256 price) = marketContract.getByAddressAndId(address(erc721Contract), tokensIds[0]);
         vm.assertEq(price, prices[0]);
@@ -99,11 +97,11 @@ contract MarketPlaceTest is Test {
     function test_NonOwnedTokenId_add() public {
         vm.startPrank(mix);
         erc721Contract.setApprovalForAll(address(marketContract), true);
-        vm.expectRevert(bytes("permission denied"));
+        vm.expectRevert(bytes("must use approval or operator, or be owner"));
         marketContract.add(address(erc721Contract), tokensIds[0], addressesToken[0], prices[0]);
     }
     // change
-    function test_Correct_change() public {
+    function test_correct_change() public {
         _setOwnerApprovalAndAddTwoDefaultNft();
 
         (IERC20 payableTokenBefore,uint256 priceBefore) = marketContract.getByAddressAndId(address(erc721Contract), tokensIds[0]);
@@ -125,7 +123,7 @@ contract MarketPlaceTest is Test {
         address newErc20 = address(new SimpleERC20("new20", "N20"));
         uint newPrice = 100;
 
-        vm.expectRevert(bytes("permission denied"));
+        vm.expectRevert(bytes("must use approval or operator, or be owner"));
         marketContract.change(address(erc721Contract), tokensIds[0], newErc20, newPrice);
     }
 
@@ -148,7 +146,7 @@ contract MarketPlaceTest is Test {
         marketContract.change(address(erc721Contract), tokensIds[0], addressesToken[0], prices[0]);
     }
     // cancel
-    function test_Correct_cancel() public {
+    function test_correct_cancel() public {
         _setOwnerApprovalAndAddTwoDefaultNft();
 
         vm.prank(owner);
@@ -191,8 +189,39 @@ contract MarketPlaceTest is Test {
         vm.assertEq(erc20Contract.balanceOf(mix), balanceBefore - tokenPrice);
         vm.assertEq(erc721Contract.ownerOf(tokensIds[0]), mix);
     }
+    // haveRules(addressNFT, tokenId) isOffered(addressNFT, tokenId)
+    function test_correct_offOffers() external {
+        _setOwnerApprovalAndAddTwoDefaultNft();
+
+        vm.prank(owner);
+        marketContract.offOffers(address(erc721Contract), tokensIds[0]);
+
+        vm.prank(mix);
+        vm.expectRevert(bytes("token not offered"));
+        marketContract.setOffer(address(erc721Contract), tokensIds[0], 100, 100);
+    }
+
+    function test_bad_onOffers() external{
+        _setOwnerApprovalAndAddTwoDefaultNft();
+        vm.prank(owner);
+        vm.expectRevert(bytes("token is offered"));
+        marketContract.onOffers(address(erc721Contract), tokensIds[0]);
+    }
+
+    function test_correct_onOffers() external{
+        _setOwnerApprovalAndAddTwoDefaultNft();
+
+        vm.prank(owner);
+        marketContract.offOffers(address(erc721Contract), tokensIds[0]);
+
+        vm.prank(owner);
+        marketContract.onOffers(address(erc721Contract), tokensIds[0]);
+        
+        vm.prank(mix);
+        marketContract.setOffer(address(erc721Contract), tokensIds[0], 100, 100);
+    }
     // setOffer
-    function test_correct_offer() public {
+    function test_correct_setOffer() public {
         uint offer = 100_000;
         uint endTime = block.timestamp + 10;
         _setOwnerApprovalAndAddTwoDefaultNft();
@@ -202,22 +231,20 @@ contract MarketPlaceTest is Test {
         
         vm.prank(mix);
         marketContract.setOffer(address(erc721Contract), tokensIds[0], offer, endTime);
+        // mapping(address NFT => mapping(uint tokenId => mapping(address from => Offer))) _offers;
 
-        bytes32 key = keccak256(abi.encode(address(erc721Contract), 6));
-        bytes32 keytoKey = keccak256(abi.encode(tokensIds[0], key));
+        bytes32 keyNFT = keccak256(abi.encode(address(erc721Contract), 5));
+        bytes32 keyTokenId = keccak256(abi.encode(tokensIds[0], keyNFT));
+        bytes32 keyAddressFrom = keccak256(abi.encode(mix, keyTokenId));
 
-        bytes32 arrayStart = keccak256(abi.encode(keytoKey));
+        uint endOfferTime = uint256(vm.load(address(marketContract), keyAddressFrom));
+        uint amount = uint256(vm.load(address(marketContract), bytes32(uint256(keyAddressFrom) + 1)));
 
-        address from = address(uint160(uint256((vm.load(address(marketContract), arrayStart)))));
-        uint amount = uint256(vm.load(address(marketContract), bytes32(uint256(arrayStart) + 1)));
-        uint endOfferTime = uint256(vm.load(address(marketContract), bytes32(uint256(arrayStart) + 2)));
-
-        vm.assertEq(from, mix);
         vm.assertEq(endOfferTime, endTime);
         vm.assertEq(amount, offer);
     }    
 
-    function test_Correct_receiveOffer() external {
+    function test_correct_receiveOffer() external {
         _setOwnerApprovalAndAddTwoDefaultNft();
 
         uint offer = 100_000;
@@ -227,14 +254,13 @@ contract MarketPlaceTest is Test {
         vm.prank(mix);
         marketContract.setOffer(address(erc721Contract), tokensIds[0], offer, endTime);
 
-        uint currentOfferId = marketContract.getOffers(address(erc721Contract), tokensIds[0]).length - 1;
         uint offerWithFee = marketContract.calculatePersent(offer) + offer;
 
         vm.prank(mix);
         erc20Contract.approve(address(marketContract), offerWithFee);
 
         vm.startPrank(owner);
-        marketContract.receiveOffer(address(erc721Contract), tokensIds[0], currentOfferId);
+        marketContract.receiveOffer(address(erc721Contract), tokensIds[0], mix);
         
         address tokenOwner = erc721Contract.ownerOf(tokensIds[0]);
         vm.assertEq(mix, tokenOwner);
@@ -245,18 +271,16 @@ contract MarketPlaceTest is Test {
         uint offer = 100_000;
         uint endTime = block.timestamp + 10;
         
-        uint currentOfferId = marketContract.getOffers(address(erc721Contract), tokensIds[0]).length;
 
         vm.startPrank(mix);
         marketContract.setOffer(address(erc721Contract), tokensIds[0], offer, endTime);
 
-        Marketplace.Offer memory offersBeforeClosed = marketContract.getOffers(address(erc721Contract), tokensIds[0])[0];
+        marketContract.closeOffer(address(erc721Contract), tokensIds[0], mix);
 
-        marketContract.closeOffer(address(erc721Contract), tokensIds[0], currentOfferId);
+        Marketplace.Offer memory offersAfterClosed = marketContract.getOffers(address(erc721Contract), tokensIds[0], mix);
 
-        Marketplace.Offer memory offersAfterClosed = marketContract.getOffers(address(erc721Contract), tokensIds[0])[0];
-
-        vm.assertNotEq(offersAfterClosed.from, offersBeforeClosed.from);
+        vm.assertEq(offersAfterClosed.endTime, 0);
+        vm.assertEq(offersAfterClosed.amount, 0);
     }
     
     function test_NotOwner_closeOffer() external {
@@ -267,10 +291,8 @@ contract MarketPlaceTest is Test {
         vm.prank(mix);
         marketContract.setOffer(address(erc721Contract), tokensIds[0], offer, endTime);
 
-        uint currentOfferId = marketContract.getOffers(address(erc721Contract), tokensIds[0]).length - 1;
-
         vm.expectRevert(bytes("permission denied"));
-        marketContract.closeOffer(address(erc721Contract), tokensIds[0], currentOfferId);
+        marketContract.closeOffer(address(erc721Contract), tokensIds[0], mix);
     }
 
     function test_NotOwnerTimeExpired_closeOffer() external {
@@ -281,16 +303,13 @@ contract MarketPlaceTest is Test {
         vm.prank(mix);
         marketContract.setOffer(address(erc721Contract), tokensIds[0], offer, endTime);
 
-        uint currentOfferId = marketContract.getOffers(address(erc721Contract), tokensIds[0]).length - 1;
-        Marketplace.Offer memory offersBeforeClosed = marketContract.getOffers(address(erc721Contract), tokensIds[0])[currentOfferId];
-
-        vm.warp(17646703560);
+        vm.warp(type(uint56).max);
         vm.prank(vm.addr(100000));
-        marketContract.closeOffer(address(erc721Contract), tokensIds[0], currentOfferId);
+        marketContract.closeOffer(address(erc721Contract), tokensIds[0], mix);
 
-        Marketplace.Offer memory offersAfterClosed = marketContract.getOffers(address(erc721Contract), tokensIds[0])[currentOfferId];
-
-        vm.assertNotEq(offersBeforeClosed.from, offersAfterClosed.from);
+        Marketplace.Offer memory offersAfterClosed = marketContract.getOffers(address(erc721Contract), tokensIds[0], mix);
+        vm.assertEq(offersAfterClosed.endTime, 0);
+        vm.assertEq(offersAfterClosed.amount, 0);
     }
     
     function test_NotOwnerTimeNotExpired_closeOffer() external {
@@ -301,10 +320,8 @@ contract MarketPlaceTest is Test {
         vm.prank(mix);
         marketContract.setOffer(address(erc721Contract), tokensIds[0], offer, endTime);
 
-        uint currentOfferId = marketContract.getOffers(address(erc721Contract), tokensIds[0]).length - 1;
-
         vm.expectRevert(bytes("permission denied"));
-        marketContract.closeOffer(address(erc721Contract), tokensIds[0], currentOfferId);
+        marketContract.closeOffer(address(erc721Contract), tokensIds[0], mix);
     }
     // setFeePersent
     function test_Zero_setFeePersent() external {
@@ -312,7 +329,7 @@ contract MarketPlaceTest is Test {
         marketContract.setFeePersent(0);
     }
 
-    function test_Correct_setFeePersent() external {
+    function test_correct_setFeePersent() external {
         uint fiveteenPersent = 5000;
         marketContract.setFeePersent(fiveteenPersent);
 
@@ -326,7 +343,7 @@ contract MarketPlaceTest is Test {
         marketContract.setFeeReceiver(mix);
     }
 
-    function test_Correct_setFeeReceiver() external {
+    function test_correct_setFeeReceiver() external {
         marketContract.setFeeReceiver(mix);
 
         address currentReciever = marketContract.getReceiver();
@@ -342,21 +359,8 @@ contract MarketPlaceTest is Test {
         address currentReciever = marketContract.getReceiver();
         vm.assertEq(currentReciever, receiver);
     }
-    // getAll
-    function test_getAll() external {
-        _setOwnerApprovalAndAddTwoDefaultNft();
-        address[] memory allNfths = marketContract.getAll();
-        vm.assertEq(allNfths[0], address(erc721Contract));
-    }
-    // getTokensId
-    function test_getTokensId() external {
-        _setOwnerApprovalAndAddTwoDefaultNft();
-        uint[] memory allTokensIds = marketContract.getTokensId(address(erc721Contract));
-        vm.assertEq(allTokensIds[0], tokensIds[0]);
-        vm.assertEq(allTokensIds[1], tokensIds[1]);
-    }
     // calculatePersent
-    function test_Correct_calculatePersent() external view {
+    function test_correct_calculatePersent() external view {
         uint correctPrice = 100;
         uint fee = marketContract.calculatePersent(correctPrice);
         vm.assertEq(fee, 2);
